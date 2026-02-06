@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2020",                /* Phiên bản JavaScript đầu ra (Node 18+ hỗ trợ tốt ES2020) */
+    "module": "commonjs",              /* Sử dụng CommonJS (chuẩn mặc định của Node.js) để ổn định nhất */
+    "moduleResolution": "node",        /* Cơ chế tìm file kiểu Node.js truyền thống */
+    "baseUrl": "./",
+    "outDir": "./dist",                /* Thư mục chứa code sau khi build */
+    "rootDir": "./src",                /* Thư mục chứa code nguồn */
+    
+    /* Strict Type-Checking Options */
+    "strict": true,                    /* Bật chế độ kiểm tra type nghiêm ngặt */
+    
+    /* Module Resolution Options */
+    "esModuleInterop": true,           /* Cho phép import các thư viện CommonJS (như express) bằng cú pháp 'import' */
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,              /* Bỏ qua kiểm tra type của các thư viện trong node_modules để build nhanh hơn */
+    "forceConsistentCasingInFileNames": true,
+
+    /* Support cho Decorators (Cần thiết nếu sau này dùng TypeORM hoặc các thư viện class-based) */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

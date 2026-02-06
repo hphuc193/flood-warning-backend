@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  postgres:
+    # Sử dụng image có sẵn PostGIS như trong tài liệu thiết kế
+    image: postgis/postgis:14-3.3
+    container_name: flood_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flood_network
+
+volumes:
+  postgres_data:
+
+networks:
+  flood_network:
+    driver: bridge
