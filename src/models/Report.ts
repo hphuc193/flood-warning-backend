@@ -4,7 +4,7 @@ import User from './User';
 
 interface ReportAttributes {
   id: number;
-  user_id: string; // Đổi thành number cho khớp với bảng User của bạn
+  user_id: number; // Đổi thành number cho khớp với bảng User của bạn
   lat: number;
   long: number;
   description?: string;
@@ -16,7 +16,7 @@ interface ReportCreationAttributes extends Optional<ReportAttributes, 'id' | 'st
 
 class Report extends Model<ReportAttributes, ReportCreationAttributes> implements ReportAttributes {
   public id!: number;
-  public user_id!: string;
+  public user_id!: number;
   public lat!: number;
   public long!: number;
   public description!: string;
@@ -30,12 +30,12 @@ class Report extends Model<ReportAttributes, ReportCreationAttributes> implement
 Report.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    user_id: { type: DataTypes.UUID, allowNull: false }, // Khớp với User ID
+    user_id: { type: DataTypes.INTEGER, allowNull: false }, // Khớp với User ID
     lat: { type: DataTypes.FLOAT, allowNull: false },
     long: { type: DataTypes.FLOAT, allowNull: false },
     description: { type: DataTypes.TEXT },
     images: { 
-      type: DataTypes.ARRAY(DataTypes.STRING), 
+      type: DataTypes.ARRAY(DataTypes.TEXT), 
       defaultValue: [] 
     },
     status: { 

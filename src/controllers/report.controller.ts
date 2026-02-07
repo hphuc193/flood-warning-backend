@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import Report from '../models/Report';
 import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,13 +7,19 @@ import { v4 as uuidv4 } from 'uuid';
 // 1. Tạo báo cáo mới
 export const createReport = async (req: Request, res: Response) => {
   try {
-    const { user_id, lat, long, description } = req.body;
+    const authReq = req as AuthRequest;
+    const user_id = authReq.user?.id;
+    const { lat, long, description } = req.body;
     const files = req.files as Express.Multer.File[];
 
-    if (!user_id || !lat || !long) {
-      return res.status(400).json({ success: false, message: 'Thiếu thông tin user_id, lat hoặc long' });
+    // Kiểm tra User ID
+    if (!user_id) {
+        return res.status(401).json({ success: false, message: 'User ID không tồn tại trong Token' });
     }
 
+    if (!lat || !long) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin lat hoặc long' });
+    }
     const imageUrls: string[] = [];
 
     // Xử lý upload lên Firebase

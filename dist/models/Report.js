@@ -10,12 +10,12 @@ class Report extends sequelize_1.Model {
 }
 Report.init({
     id: { type: sequelize_1.DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    user_id: { type: sequelize_1.DataTypes.UUID, allowNull: false }, // Khớp với User ID
+    user_id: { type: sequelize_1.DataTypes.INTEGER, allowNull: false }, // Khớp với User ID
     lat: { type: sequelize_1.DataTypes.FLOAT, allowNull: false },
     long: { type: sequelize_1.DataTypes.FLOAT, allowNull: false },
     description: { type: sequelize_1.DataTypes.TEXT },
     images: {
-        type: sequelize_1.DataTypes.ARRAY(sequelize_1.DataTypes.STRING),
+        type: sequelize_1.DataTypes.ARRAY(sequelize_1.DataTypes.TEXT),
         defaultValue: []
     },
     status: {

@@ -3,12 +3,96 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loginWithFirebase = void 0;
+exports.loginWithFirebase = exports.login = exports.register = void 0;
 const firebase_1 = require("../config/firebase");
 const User_1 = __importDefault(require("../models/User"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 dotenv_1.default.config();
+// 1. Đăng ký tài khoản (Native)
+const register = async (req, res) => {
+    try {
+        const { email, password, full_name } = req.body;
+        // Validate cơ bản
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập email và mật khẩu' });
+        }
+        // Kiểm tra email đã tồn tại chưa
+        const existingUser = await User_1.default.findOne({ where: { email } });
+        if (existingUser) {
+            return res.status(409).json({ success: false, message: 'Email này đã được sử dụng' });
+        }
+        // Băm mật khẩu (Hashing)
+        const salt = await bcryptjs_1.default.genSalt(10);
+        const hashedPassword = await bcryptjs_1.default.hash(password, salt);
+        // Tạo User mới
+        const newUser = await User_1.default.create({
+            email,
+            password: hashedPassword, // Lưu password đã băm
+            full_name: full_name || 'New User',
+            role: 'user',
+            status: 'active',
+            // firebase_uid để trống
+        });
+        // (Tùy chọn) Tạo luôn token để đăng nhập ngay sau khi đăng ký
+        // ...
+        return res.status(201).json({
+            success: true,
+            message: 'Đăng ký thành công',
+            data: {
+                id: newUser.id,
+                email: newUser.email,
+                full_name: newUser.full_name
+            }
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+exports.register = register;
+// 2. Đăng nhập (Native)
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: 'Thiếu email hoặc mật khẩu' });
+        }
+        // Tìm user theo email
+        const user = await User_1.default.findOne({ where: { email } });
+        if (!user) {
+            return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
+        }
+        // Nếu user này đăng nhập bằng Google (không có password)
+        if (!user.password) {
+            return res.status(400).json({ success: false, message: 'Tài khoản này dùng đăng nhập Google, vui lòng chọn Login with Google' });
+        }
+        // Kiểm tra mật khẩu (So sánh password nhập vào với password đã băm trong DB)
+        const isMatch = await bcryptjs_1.default.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
+        }
+        const secretKey = process.env.JWT_SECRET;
+        // Tạo JWT Token
+        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role }, secretKey, { expiresIn: '7d' });
+        return res.status(200).json({
+            success: true,
+            message: 'Đăng nhập thành công',
+            token, // Trả về token cho Client lưu
+            user: {
+                id: user.id,
+                email: user.email,
+                full_name: user.full_name,
+                avatar_url: user.avatar_url
+            }
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+exports.login = login;
 // Hàm xử lý đăng nhập bằng Firebase
 const loginWithFirebase = async (req, res) => {
     try {

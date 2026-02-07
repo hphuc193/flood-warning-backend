@@ -8,13 +8,13 @@ class User extends sequelize_1.Model {
 // 3. Khởi tạo bảng
 User.init({
     id: {
-        type: sequelize_1.DataTypes.UUID,
-        defaultValue: sequelize_1.DataTypes.UUIDV4, // Tự động tạo mã UUID ngẫu nhiên
+        type: sequelize_1.DataTypes.INTEGER,
+        autoIncrement: true,
         primaryKey: true,
     },
     firebase_uid: {
         type: sequelize_1.DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         unique: true, // Mỗi Firebase UID chỉ được tồn tại 1 lần
     },
     full_name: {
@@ -25,6 +25,10 @@ User.init({
         allowNull: false,
         unique: true,
         validate: { isEmail: true },
+    },
+    password: {
+        type: sequelize_1.DataTypes.STRING,
+        allowNull: true, // Google User không có pass nên phải cho null
     },
     phone_number: {
         type: sequelize_1.DataTypes.STRING,

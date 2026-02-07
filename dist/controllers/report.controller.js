@@ -10,10 +10,16 @@ const uuid_1 = require("uuid");
 // 1. Tạo báo cáo mới
 const createReport = async (req, res) => {
     try {
-        const { user_id, lat, long, description } = req.body;
+        const authReq = req;
+        const user_id = authReq.user?.id;
+        const { lat, long, description } = req.body;
         const files = req.files;
-        if (!user_id || !lat || !long) {
-            return res.status(400).json({ success: false, message: 'Thiếu thông tin user_id, lat hoặc long' });
+        // Kiểm tra User ID
+        if (!user_id) {
+            return res.status(401).json({ success: false, message: 'User ID không tồn tại trong Token' });
+        }
+        if (!lat || !long) {
+            return res.status(400).json({ success: false, message: 'Thiếu thông tin lat hoặc long' });
         }
         const imageUrls = [];
         // Xử lý upload lên Firebase

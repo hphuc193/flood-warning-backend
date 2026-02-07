@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { loginWithFirebase } from '../controllers/auth.controller';
+import { login, loginWithFirebase, register } from '../controllers/auth.controller';
 
 const router = Router();
 
 // POST /api/v1/auth/firebase-login
 router.post('/firebase-login', loginWithFirebase);
+router.post('/register', register);
+router.post('/login', login);
 
 export default router;

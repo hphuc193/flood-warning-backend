@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { createReport, getReports } from '../controllers/report.controller';
+import { verifyToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -11,7 +12,7 @@ const upload = multer({
 });
 
 // Endpoint
-router.post('/', upload.array('images', 5), createReport);
-router.get('/', getReports);
+router.post('/', verifyToken, upload.array('images', 5), createReport);
+router.get('/', verifyToken, getReports);
 
 export default router;
