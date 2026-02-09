@@ -1,18 +1,31 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { createReport, getReports } from '../controllers/report.controller';
-import { verifyToken } from '../middleware/auth.middleware';
+import { 
+    createReport, 
+    getReports, 
+    updateReportStatus, 
+    getReportsNearby 
+} from '../controllers/report.controller';
+import { verifyToken, checkAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Cấu hình Multer: Lưu file vào RAM tạm thời trước khi đẩy lên Firebase
+// Cấu hình upload ảnh
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Endpoint
+// 1. Route Tìm kiếm (Nearby) -> PHẢI ĐẶT LÊN ĐẦU
+router.get('/nearby', getReportsNearby); 
+
+// 2. Route Lấy danh sách (Gốc)
+router.get('/', getReports);
+
+// 3. Route Tạo mới
 router.post('/', verifyToken, upload.array('images', 5), createReport);
-router.get('/', verifyToken, getReports);
+
+// 4. Route Admin duyệt (Có tham số :id nên đặt ở cuối cùng)
+router.patch('/:id/status', verifyToken, checkAdmin, updateReportStatus);
 
 export default router;

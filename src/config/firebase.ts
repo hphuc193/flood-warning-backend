@@ -10,7 +10,7 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY
   : undefined;
 
 if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
-  console.error('❌ Thiếu cấu hình Firebase trong file .env');
+  console.error('Thiếu cấu hình Firebase trong file .env');
 } else {
   try {
     admin.initializeApp({

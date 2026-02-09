@@ -4,6 +4,7 @@ import User from '../models/User';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
+import { io } from '../server';
 
 dotenv.config();
 // 1. Đăng ký tài khoản (Native)
