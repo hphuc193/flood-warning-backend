@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { addWeatherData, getCurrentWeather, getWeatherHistory } from '../controllers/weather.controller';
+import { 
+  addWeatherData, 
+  getCurrentWeather, 
+  getWeatherHistory, 
+  getWeatherForecast 
+} from '../controllers/weather.controller';
 
 const router = Router();
 
@@ -71,10 +76,33 @@ router.post('/', addWeatherData);
  * responses:
  * 200:
  * description: Thành công
- * 400:
- * description: Thiếu tọa độ
  */
 router.get('/current', getCurrentWeather);
+
+/**
+ * @swagger
+ * /api/v1/weather/forecast:
+ * get:
+ * summary: Lấy dự báo thời tiết 5 ngày tới
+ * tags: [Weather]
+ * parameters:
+ * - in: query
+ * name: lat
+ * schema:
+ * type: number
+ * required: true
+ * description: Vĩ độ
+ * - in: query
+ * name: long
+ * schema:
+ * type: number
+ * required: true
+ * description: Kinh độ
+ * responses:
+ * 200:
+ * description: Thành công
+ */
+router.get('/forecast', getWeatherForecast);
 
 /**
  * @swagger

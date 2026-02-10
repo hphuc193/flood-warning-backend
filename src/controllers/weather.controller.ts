@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import WeatherData from '../models/WeatherData';
 import Location from '../models/Location';
 import socketService from '../services/socket.service';
-import { WeatherService } from '../services/weather.service'; // <--- Import Service mới
+import { WeatherService } from '../services/weather.service';
 
-// 1. API: Nhận dữ liệu (Dùng để giả lập/test cảnh báo ngập & Socket)
+// 1. API: Nhận dữ liệu (Giả lập Sensor)
 export const addWeatherData = async (req: Request, res: Response) => {
   try {
     const { location_id, temperature, humidity, rainfall, wind_speed } = req.body;
@@ -24,7 +24,6 @@ export const addWeatherData = async (req: Request, res: Response) => {
 
     console.log(`🔥 [DEBUG] Chuẩn bị bắn Socket cho Location ID: ${location_id}`);
 
-    // Bắn Socket để App nhận cảnh báo ngay lập tức
     socketService.emitToLocation(location_id, 'weather_update', {
         location_id,
         temperature,
@@ -38,24 +37,20 @@ export const addWeatherData = async (req: Request, res: Response) => {
   }
 };
 
-// 2. API: Lấy thời tiết thật (Từ OpenWeatherMap)
-// SỬA: Chuyển từ dùng location_id sang dùng lat/long
+// 2. API: Lấy thời tiết hiện tại (OpenWeatherMap)
 export const getCurrentWeather = async (req: Request, res: Response) => {
   try {
     const { lat, long } = req.query;
 
-    // Nếu thiếu tọa độ, báo lỗi
     if (!lat || !long) {
       return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat, long' });
     }
 
-    // Gọi Service lấy dữ liệu thật
     const current = await WeatherService.getCurrentWeather(
       parseFloat(lat as string), 
       parseFloat(long as string)
     );
 
-    // Format dữ liệu cho gọn gàng
     const data = {
       temp: current.main.temp,
       humidity: current.main.humidity,
@@ -63,7 +58,7 @@ export const getCurrentWeather = async (req: Request, res: Response) => {
       icon: `https://openweathermap.org/img/wn/${current.weather[0].icon}@2x.png`,
       wind_speed: current.wind.speed,
       city: current.name,
-      source: 'OpenWeatherMap' // Đánh dấu nguồn dữ liệu
+      source: 'OpenWeatherMap'
     };
 
     return res.status(200).json({ success: true, data });
@@ -72,7 +67,7 @@ export const getCurrentWeather = async (req: Request, res: Response) => {
   }
 };
 
-// 3. API: Lấy lịch sử (Giữ nguyên để xem log dữ liệu giả lập)
+// 3. API: Lấy lịch sử (DB)
 export const getWeatherHistory = async (req: Request, res: Response) => {
     try {
       const { location_id, limit } = req.query;
@@ -94,4 +89,55 @@ export const getWeatherHistory = async (req: Request, res: Response) => {
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
     }
-  };
+};
+
+// 4. API: Lấy dự báo 5 ngày (OpenWeatherMap)
+export const getWeatherForecast = async (req: Request, res: Response) => {
+  try {
+    const { lat, long } = req.query;
+
+    if (!lat || !long) {
+      return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat, long' });
+    }
+
+    // Gọi Service
+    const rawData = await WeatherService.getForecast(
+      parseFloat(lat as string), 
+      parseFloat(long as string)
+    );
+
+    // Logic gộp dữ liệu 3 giờ thành 1 ngày
+    const dailyForecast: any = {};
+
+    rawData.list.forEach((item: any) => {
+      const date = item.dt_txt.split(' ')[0];
+      if (!dailyForecast[date]) {
+        dailyForecast[date] = {
+          date: date,
+          temp_min: item.main.temp_min,
+          temp_max: item.main.temp_max,
+          description: item.weather[0].description,
+          icon: `https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`,
+          humidity: item.main.humidity,
+          rain_prob: item.pop 
+        };
+      } else {
+        dailyForecast[date].temp_min = Math.min(dailyForecast[date].temp_min, item.main.temp_min);
+        dailyForecast[date].temp_max = Math.max(dailyForecast[date].temp_max, item.main.temp_max);
+        dailyForecast[date].rain_prob = Math.max(dailyForecast[date].rain_prob, item.pop);
+      }
+    });
+
+    const result = Object.values(dailyForecast);
+    
+    return res.status(200).json({ 
+      success: true, 
+      city: rawData.city.name,
+      count: result.length,
+      data: result 
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
