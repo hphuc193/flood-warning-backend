@@ -29,4 +29,4 @@ if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !p
 
 export const firebaseStorage = getStorage().bucket();
 export const firebaseAuth = admin.auth();
-export const firebaseMessaging = admin.messaging(); // Dùng cho thông báo đẩy sau này
+export const firebaseMessaging = admin.messaging();

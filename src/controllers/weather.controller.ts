@@ -91,7 +91,7 @@ export const getWeatherHistory = async (req: Request, res: Response) => {
     }
 };
 
-// 4. API: Lấy dự báo 5 ngày (OpenWeatherMap)
+// 4. API: Lấy dự báo 5 ngày (Trả về chi tiết nguyên bản từ OpenWeatherMap)
 export const getWeatherForecast = async (req: Request, res: Response) => {
   try {
     const { lat, long } = req.query;
@@ -100,41 +100,18 @@ export const getWeatherForecast = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat, long' });
     }
 
-    // Gọi Service
+    // Gọi Service lấy toàn bộ dữ liệu thô từ OpenWeatherMap
     const rawData = await WeatherService.getForecast(
       parseFloat(lat as string), 
       parseFloat(long as string)
     );
 
-    // Logic gộp dữ liệu 3 giờ thành 1 ngày
-    const dailyForecast: any = {};
-
-    rawData.list.forEach((item: any) => {
-      const date = item.dt_txt.split(' ')[0];
-      if (!dailyForecast[date]) {
-        dailyForecast[date] = {
-          date: date,
-          temp_min: item.main.temp_min,
-          temp_max: item.main.temp_max,
-          description: item.weather[0].description,
-          icon: `https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`,
-          humidity: item.main.humidity,
-          rain_prob: item.pop 
-        };
-      } else {
-        dailyForecast[date].temp_min = Math.min(dailyForecast[date].temp_min, item.main.temp_min);
-        dailyForecast[date].temp_max = Math.max(dailyForecast[date].temp_max, item.main.temp_max);
-        dailyForecast[date].rain_prob = Math.max(dailyForecast[date].rain_prob, item.pop);
-      }
-    });
-
-    const result = Object.values(dailyForecast);
-    
+    // Trả về trực tiếp dữ liệu gốc mà không qua xử lý gộp nhóm
     return res.status(200).json({ 
       success: true, 
-      city: rawData.city.name,
-      count: result.length,
-      data: result 
+      city: rawData.city, // Trả về toàn bộ object city (tên, tọa độ, timezone, bình minh, hoàng hôn...)
+      count: rawData.cnt, // Thường là 40 (dữ liệu cho 5 ngày x 8 mốc/ngày)
+      data: rawData.list  // Mảng chứa đầy đủ các thông tin: main, weather, clouds, wind, visibility, pop...
     });
 
   } catch (error: any) {
