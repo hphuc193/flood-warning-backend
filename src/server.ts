@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.routes';
 import locationRoutes from './routes/location.routes';
 import weatherRoutes from './routes/weather.routes';
 import alertRoutes from './routes/alert.routes';
+import userRoutes from './routes/user.routes';
 // import socketService from './services/socket.service'; // Tạm thời comment dòng này lại để tránh xung đột
 
 import './models/User';
@@ -45,6 +46,7 @@ app.use('/api/v1/weather', weatherRoutes);
 app.use('/api/v1/alerts', alertRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/v1/users', userRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
@@ -55,12 +57,12 @@ const startServer = async () => {
     
     // Đồng bộ Model (Chỉ cần chạy 1 lần)
     await sequelize.sync({ alter: true });
-    console.log('Database synchronized.');
+    console.log(' 📩 Database synchronized.');
 
     // Lắng nghe cổng
     httpServer.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-      console.log(`Socket.io is ready for connections`);
+      console.log(` 🖥️  Server is running on http://localhost:${PORT}`);
+      console.log(` 🌾 Socket.io is ready for connections`);
     });
   } catch (error) {
     console.error('Unable to start server:', error);
