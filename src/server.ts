@@ -12,6 +12,7 @@ import locationRoutes from './routes/location.routes';
 import weatherRoutes from './routes/weather.routes';
 import alertRoutes from './routes/alert.routes';
 import userRoutes from './routes/user.routes';
+import userLocationRoutes from './routes/userLocation.routes';
 // import socketService from './services/socket.service'; // Tạm thời comment dòng này lại để tránh xung đột
 
 import './models/User';
@@ -47,6 +48,7 @@ app.use('/api/v1/alerts', alertRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/user-locations', userLocationRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
