@@ -3,6 +3,9 @@ import WeatherData from '../models/WeatherData';
 import Location from '../models/Location';
 import socketService from '../services/socket.service';
 import { WeatherService } from '../services/weather.service';
+import NodeCache from 'node-cache';
+
+const weatherCache = new NodeCache({ stdTTL: 86400 });
 
 // 1. API: Nhận dữ liệu (Giả lập Sensor)
 export const addWeatherData = async (req: Request, res: Response) => {
@@ -112,6 +115,56 @@ export const getWeatherForecast = async (req: Request, res: Response) => {
       city: rawData.city, // Trả về toàn bộ object city (tên, tọa độ, timezone, bình minh, hoàng hôn...)
       count: rawData.cnt, // Thường là 40 (dữ liệu cho 5 ngày x 8 mốc/ngày)
       data: rawData.list  // Mảng chứa đầy đủ các thông tin: main, weather, clouds, wind, visibility, pop...
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getRainfallHistory = async (req: Request, res: Response) => {
+  try {
+    const { lat, long, days } = req.query;
+
+    if (!lat || !long) {
+      return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat, long' });
+    }
+
+    // Mặc định lấy 30 ngày, tối đa 365 ngày
+    const daysRequested = days ? parseInt(days as string) : 30;
+    if (daysRequested < 1 || daysRequested > 365) {
+      return res.status(400).json({ success: false, message: 'Số ngày phải từ 1 đến 365' });
+    }
+
+    // 1. Kiểm tra Cache xem có dữ liệu của tọa độ + số ngày này chưa
+    const cacheKey = `rain_history_${lat}_${long}_${daysRequested}`;
+    const cachedData = weatherCache.get(cacheKey);
+
+    if (cachedData) {
+      console.log(`[CACHE HIT] Lấy dữ liệu mưa từ Cache cho ${lat}, ${long}`);
+      return res.status(200).json({ 
+        success: true, 
+        cached: true,
+        data: cachedData 
+      });
+    }
+
+    // 2. Nếu không có Cache, gọi API Open-Meteo (Service)
+    console.log(`[CACHE MISS] Gọi API Open-Meteo lấy dữ liệu mưa cho ${lat}, ${long}`);
+    const historyData = await WeatherService.getHistoricalRainfall(
+      parseFloat(lat as string), 
+      parseFloat(long as string), 
+      daysRequested
+    );
+
+    // 3. Lưu vào Cache để lần sau dùng
+    weatherCache.set(cacheKey, historyData);
+
+    // Trả về kết quả
+    return res.status(200).json({ 
+      success: true, 
+      cached: false,
+      data: historyData 
     });
 
   } catch (error: any) {

@@ -3,7 +3,8 @@ import {
   addWeatherData, 
   getCurrentWeather, 
   getWeatherHistory, 
-  getWeatherForecast 
+  getWeatherForecast,
+  getRainfallHistory 
 } from '../controllers/weather.controller';
 
 const router = Router();
@@ -122,5 +123,37 @@ router.get('/forecast', getWeatherForecast);
  *         description: Thành công
  */
 router.get('/history', getWeatherHistory);
+
+/**
+ * @swagger
+ * /api/v1/weather/rainfall-history:
+ *   get:
+ *     summary: Lấy lịch sử dữ liệu mưa (Hỗ trợ Line Chart & Heat Map)
+ *     tags: [Weather]
+ *     parameters:
+ *       - in: query
+ *         name: lat
+ *         schema:
+ *           type: number
+ *         required: true
+ *         description: Vĩ độ
+ *       - in: query
+ *         name: long
+ *         schema:
+ *           type: number
+ *         required: true
+ *         description: Kinh độ
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *         required: false
+ *         description: Số ngày lấy dữ liệu (từ 1 đến 365)
+ *     responses:
+ *       200:
+ *         description: Thành công
+ */
+router.get('/rainfall-history', getRainfallHistory);
 
 export default router;
