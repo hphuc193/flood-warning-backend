@@ -14,6 +14,7 @@ import alertRoutes from './routes/alert.routes';
 import userRoutes from './routes/user.routes';
 import userLocationRoutes from './routes/userLocation.routes';
 import checklistRoutes from './routes/checklist.routes';
+import evacuationRoutes from './routes/evacuation.routes';
 // import socketService from './services/socket.service'; // Tạm thời comment dòng này lại để tránh xung đột
 
 import './models/User';
@@ -51,6 +52,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/user-locations', userLocationRoutes);
 app.use('/api/v1/checklists', checklistRoutes);
+app.use('/api/v1/evacuation', evacuationRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
