@@ -16,7 +16,8 @@ import userLocationRoutes from './routes/userLocation.routes';
 import checklistRoutes from './routes/checklist.routes';
 import evacuationRoutes from './routes/evacuation.routes';
 import emergencyRoutes from './routes/emergency.routes';
-// import socketService from './services/socket.service'; // Tạm thời comment dòng này lại để tránh xung đột
+import sosRoutes from './routes/sos.routes';
+// import socketService from './services/socket.service'; 
 
 import './models/User';
 import './models/Location';
@@ -55,6 +56,7 @@ app.use('/api/v1/user-locations', userLocationRoutes);
 app.use('/api/v1/checklists', checklistRoutes);
 app.use('/api/v1/evacuation', evacuationRoutes);
 app.use('/api/v1/emergency-contacts', emergencyRoutes);
+app.use('/api/v1/sos', sosRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
