@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { getProfile, updateProfile } from '../controllers/user.controller';
-import { verifyToken } from '../middleware/auth.middleware'; // Đã sửa tên middleware
+import { getProfile, updateProfile, updateAvatar } from '../controllers/user.controller';
+import { verifyToken } from '../middleware/auth.middleware';
+import { uploadAvatarMiddleware } from '../middleware/upload.middleware'; // Import middleware xử lý file
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/profile', verifyToken, getProfile);
  * @swagger
  * /api/v1/users/profile:
  *   put:
- *     summary: Cập nhật thông tin cá nhân
+ *     summary: Cập nhật thông tin văn bản (Tên, Số điện thoại)
  *     tags:
  *       - Users
  *     security:
@@ -50,9 +51,6 @@ router.get('/profile', verifyToken, getProfile);
  *               phone_number:
  *                 type: string
  *                 example: "0901234567"
- *               avatar_url:
- *                 type: string
- *                 example: https://example.com/avatar.jpg
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -62,5 +60,42 @@ router.get('/profile', verifyToken, getProfile);
  *         description: Chưa xác thực
  */
 router.put('/profile', verifyToken, updateProfile);
+
+/**
+ * @swagger
+ * /api/v1/users/profile/avatar:
+ *   patch:
+ *     summary: Cập nhật ảnh đại diện (Upload trực tiếp file ảnh)
+ *     tags:
+ *       - Users
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh (jpg, png, jpeg) được chọn từ thiết bị
+ *     responses:
+ *       200:
+ *         description: Cập nhật ảnh đại diện thành công
+ *       400:
+ *         description: Thiếu file hoặc định dạng không hợp lệ
+ *       401:
+ *         description: Chưa xác thực
+ *       500:
+ *         description: Lỗi server hoặc lỗi Firebase
+ */
+router.patch(
+  '/profile/avatar',
+  verifyToken,
+  uploadAvatarMiddleware.single('avatar'),
+  updateAvatar
+);
 
 export default router;
