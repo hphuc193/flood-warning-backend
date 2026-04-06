@@ -104,7 +104,7 @@ export const login = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-// Hàm xử lý đăng nhập bằng Firebase
+//3. Hàm xử lý đăng nhập bằng Firebase
 export const loginWithFirebase = async (req: Request, res: Response) => {
   try {
     // 1. Nhận ID Token từ Client (Flutter App gửi lên)
@@ -178,6 +178,98 @@ export const loginWithFirebase = async (req: Request, res: Response) => {
     return res.status(401).json({
       success: false,
       message: 'Xác thực thất bại',
+      error: error.message
+    });
+  }
+};
+
+// 4. Đăng nhập bằng Facebook qua Firebase
+export const loginWithFacebook = async (req: Request, res: Response) => {
+  try {
+    // 1. Nhận ID Token từ Client
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Thiếu ID Token từ Facebook' });
+    }
+
+    // 2. Xác thực Token với Firebase Server
+    const decodedToken = await firebaseAuth.verifyIdToken(token);
+    
+    // Lưu ý: Đối với Facebook, 'email' có thể bị NULL (nếu user đăng ký bằng SĐT hoặc chặn quyền chia sẻ email)
+    const { uid, email, name, picture } = decodedToken;
+
+    // 3. XỬ LÝ "BẪY" THIẾU EMAIL CỦA FACEBOOK
+    // Rất quan trọng: Bảng User của bạn đang set email là UNIQUE và NOT NULL.
+    // Nếu Facebook không trả về email, ta phải tạo một email giả định (dummy email) dựa trên UID để DB không bị crash.
+    const validEmail = email || `${uid}@facebook.dummy.com`;
+
+    // 4. Tìm xem User này đã có trong Database chưa
+    let user = await User.findOne({ where: { firebase_uid: uid } });
+
+    if (!user) {
+      // (Tùy chọn) Kiểm tra xem email thật (nếu có) đã được đăng ký bằng phương thức khác chưa
+      if (email) {
+        const existingEmailUser = await User.findOne({ where: { email: email } });
+        if (existingEmailUser) {
+          return res.status(409).json({ 
+            success: false, 
+            message: 'Email này đã được đăng ký bằng phương thức khác (Google hoặc Native). Vui lòng dùng phương thức đó.' 
+          });
+        }
+      }
+
+      // Đăng nhập lần đầu -> Tạo mới
+      user = await User.create({
+        firebase_uid: uid,
+        email: validEmail,
+        full_name: name || 'Người dùng Facebook',
+        // Trick: Ảnh Facebook mặc định khá mờ, có thể thêm type=large vào URL để lấy ảnh nét hơn (tùy thuộc vào payload Firebase trả về)
+        avatar_url: picture || '', 
+        role: 'user',
+        status: 'active'
+      });
+      console.log('✨ Đã tạo User Facebook mới:', validEmail);
+    } else {
+      // Đã tồn tại -> Cập nhật tên và avatar mới nhất
+      user.update({
+        full_name: name || user.full_name,
+        avatar_url: picture || user.avatar_url
+      });
+    }
+
+    // 5. Tạo Access Token (JWT) của hệ thống
+    const accessToken = jwt.sign(
+      { 
+        id: user.id, 
+        role: user.role, 
+        email: user.email 
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
+    );
+
+    // 6. Trả kết quả về cho Client
+    return res.status(200).json({
+      success: true,
+      message: 'Đăng nhập Facebook thành công',
+      data: {
+        access_token: accessToken,
+        user: {
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar_url
+        }
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Facebook Login Error:', error.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Xác thực Facebook thất bại',
       error: error.message
     });
   }

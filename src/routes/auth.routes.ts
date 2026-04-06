@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, loginWithFirebase, register } from '../controllers/auth.controller';
+import { login, loginWithFirebase, register, loginWithFacebook } from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -7,5 +7,6 @@ const router = Router();
 router.post('/firebase-login', loginWithFirebase);
 router.post('/register', register);
 router.post('/login', login);
+router.post('/facebook-login', loginWithFacebook);
 
 export default router;
