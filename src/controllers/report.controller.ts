@@ -59,27 +59,13 @@ export const createReport = async (req: Request, res: Response) => {
       images: imageUrls
     });
 
-    // === PHẦN SỬA LỖI: FETCH LẠI REPORT KÈM THÔNG TIN USER ===
-    // Tìm lại chính report vừa tạo và thực hiện JOIN với bảng User
-    const reportWithUser = await Report.findByPk(newReport.id, {
-      include: [
-        {
-          model: User,
-          as: 'user', // Đảm bảo alias này khớp với định nghĩa quan hệ trong model của bạn
-          attributes: ['id', 'full_name', 'avatar_url']
-        }
-      ]
-    });
-
-    if (io && reportWithUser) {
-        // Sự kiện: 'new_flood_report' -> App nghe thấy sẽ hiện thông báo với đầy đủ tên User
-        io.emit('new_flood_report', reportWithUser);
+    if (io) {
+        // Sự kiện: 'new_flood_report' -> App nghe thấy sẽ hiện thông báo
+        io.emit('new_flood_report', newReport);
         console.log('📡 Đã bắn socket sự kiện: new_flood_report');
     }
 
-    // Trả về dữ liệu đã được JOIN bảng cho Mobile App
-    return res.status(201).json({ success: true, data: reportWithUser });
-    // ========================================================
+    return res.status(201).json({ success: true, data: newReport });
 
   } catch (error: any) {
     console.error('Upload Error:', error);
