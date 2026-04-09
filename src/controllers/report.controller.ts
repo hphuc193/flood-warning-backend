@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import Report from '../models/Report';
+import User from '../models/User';
 import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
@@ -11,8 +12,6 @@ export const createReport = async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
     const user_id = authReq.user?.id;
-    // Sửa lại cách lấy user_id một chút nếu biến authReq báo lỗi, 
-    // hoặc giữ nguyên nếu code cũ của bạn đã chạy tốt đoạn này.
     
     const { lat, long, description } = req.body;
     const files = req.files as Express.Multer.File[];
@@ -27,7 +26,7 @@ export const createReport = async (req: Request, res: Response) => {
 
     const imageUrls: string[] = [];
 
-    // (Giữ nguyên đoạn xử lý upload Firebase của bạn)
+    // Xử lý upload Firebase
     if (files && files.length > 0) {
       for (const file of files) {
         const filename = `reports/${uuidv4()}_${file.originalname}`;
@@ -74,11 +73,18 @@ export const createReport = async (req: Request, res: Response) => {
   }
 };
 
-// get list report 
+// 2. get list report 
 export const getReports = async (req: Request, res: Response) => {
   try {
     const reports = await Report.findAll({
-      order: [['created_at', 'DESC']]
+      order: [['created_at', 'DESC']],
+      include: [
+        {
+          model: User,
+          as: 'user', // Phải khớp với tên alias bạn setup trong quan hệ belongsTo
+          attributes: ['id', 'full_name', 'avatar_url'] // Lấy tên và avatar
+        }
+      ]
     });
     return res.status(200).json({ success: true, data: reports });
   } catch (error: any) {
@@ -107,9 +113,8 @@ export const updateReportStatus = async (req: AuthRequest, res: Response) => {
     await report.save();
 
     // === LOGIC THÔNG BÁO ===
-    // Chỉ khi nào Admin DUYỆT (verified) thì mới bắn thông báo cho mọi người biết
     if (status === 'verified' && io) {
-      io.emit('flood_verified', report); // Sự kiện này uy tín hơn 'new_flood_report'
+      io.emit('flood_verified', report); 
     }
 
     return res.status(200).json({ success: true, message: 'Cập nhật thành công', data: report });
@@ -146,11 +151,18 @@ export const getReportsNearby = async (req: Request, res: Response) => {
     const reports = await Report.findAll({
       attributes: {
         include: [
-          [Sequelize.literal(haversine), 'distance'] // Thêm cột 'distance' vào kết quả
+          [Sequelize.literal(haversine), 'distance'] 
         ]
       },
-      where: Sequelize.where(Sequelize.literal(haversine), '<=', r), // Chỉ lấy điểm trong bán kính r
-      order: Sequelize.literal('distance ASC') // Sắp xếp từ gần đến xa
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'full_name', 'avatar_url']
+        }
+      ],
+      where: Sequelize.where(Sequelize.literal(haversine), '<=', r),
+      order: Sequelize.literal('distance ASC') 
     });
 
     return res.status(200).json({ success: true, count: reports.length, data: reports });
