@@ -6,7 +6,7 @@ import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
 import { Sequelize } from 'sequelize';
-
+Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 // 1. Tạo báo cáo mới
 export const createReport = async (req: Request, res: Response) => {
   try {
@@ -91,7 +91,6 @@ export const createReport = async (req: Request, res: Response) => {
 // 2. get list report 
 export const getReports = async (req: Request, res: Response) => {
   try {
-    Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
     const reports = await Report.findAll({
       order: [['created_at', 'DESC']],
       include: [
