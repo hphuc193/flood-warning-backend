@@ -59,13 +59,28 @@ export const createReport = async (req: Request, res: Response) => {
       images: imageUrls
     });
 
+    // === BẢN VÁ AN TOÀN ĐỂ FIX LỖI ẨN DANH ===
+    // Tìm lại report vừa tạo, JOIN bảng User (dùng bí danh 'user' đã sửa ở Model)
+    const reportWithUser = await Report.findByPk(newReport.id, {
+      include: [
+        {
+          model: User,
+          as: 'user', 
+          attributes: ['id', 'full_name', 'avatar_url']
+        }
+      ]
+    });
+
+    // Ép sang JSON thuần để tránh lỗi Circular Dependency gây crash 500
+    const responseData = reportWithUser ? reportWithUser.toJSON() : newReport;
+
     if (io) {
-        // Sự kiện: 'new_flood_report' -> App nghe thấy sẽ hiện thông báo
-        io.emit('new_flood_report', newReport);
+        io.emit('new_flood_report', responseData);
         console.log('📡 Đã bắn socket sự kiện: new_flood_report');
     }
 
-    return res.status(201).json({ success: true, data: newReport });
+    return res.status(201).json({ success: true, data: responseData });
+    // ==========================================
 
   } catch (error: any) {
     console.error('Upload Error:', error);

@@ -28,7 +28,7 @@ class Report extends Model<ReportAttributes, ReportCreationAttributes> implement
 
   // Khai báo hàm associate để gọi ở file index.ts
   public static associate(models: any) {
-    Report.belongsTo(models.User, { foreignKey: 'user_id', as: 'reporter' });
+    Report.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
   }
 }
 
