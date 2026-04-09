@@ -91,6 +91,7 @@ export const createReport = async (req: Request, res: Response) => {
 // 2. get list report 
 export const getReports = async (req: Request, res: Response) => {
   try {
+    Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
     const reports = await Report.findAll({
       order: [['created_at', 'DESC']],
       include: [
