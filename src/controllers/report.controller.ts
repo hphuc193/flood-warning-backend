@@ -143,7 +143,6 @@ export const updateReportStatus = async (req: AuthRequest, res: Response) => {
 // 4. Lấy danh sách điểm ngập trong bán kính (Ví dụ: 10km)
 export const getReportsNearby = async (req: Request, res: Response) => {
   try {
-    Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
     const { lat, long, radius } = req.query;
 
     if (!lat || !long) {
