@@ -6,53 +6,80 @@ import { WeatherService } from '../services/weather.service';
 import { sendPushNotification } from '../services/notification.service';
 
 export const startWeatherCronJob = () => {
-  // Chạy vào phút thứ 0 của mỗi giờ (Ví dụ: 6:00, 7:00, 8:00...) '* * * * *' or '0 * * * *'
   cron.schedule('* * * * *', async () => {
-    console.log('⏳ [Cron Job] Đang kiểm tra để gửi thông báo thời tiết buổi sáng...');
+    console.log('\n--- 🔍 BẮT ĐẦU CHẠY CRON JOB ---');
 
     try {
-      // 1. Lấy tất cả user có bật thông báo thời tiết và có trạng thái active
+      // Bỏ điều kiện where settings để lấy TẤT CẢ user active ra kiểm tra
       const users = await User.findAll({
         include: [{
           model: UserSetting,
           as: 'settings',
-          where: { daily_weather_noti: true }
         }],
         where: { status: 'active' }
       });
 
+      console.log(`👥 Tìm thấy ${users.length} user có trạng thái active trên hệ thống.`);
+
+      if (users.length === 0) return;
+
       for (const user of users) {
-        // Ép kiểu để lấy thông tin settings an toàn
+        console.log(`\n👤 Đang kiểm tra User: ${user.email}`);
+        
         const settings = (user as any).settings;
         
-        // Nếu user không có timezone, mặc định là giờ Việt Nam
-        const tz = settings?.timezone || 'Asia/Ho_Chi_Minh';
+        // 1. Kiểm tra Settings
+        if (!settings) {
+          console.log(`❌ LỖI: User này chưa có dữ liệu trong bảng user_settings (Chưa gọi API /device).`);
+          continue;
+        }
 
-        // 2. Kiểm tra xem ở múi giờ của user này, hiện tại có phải là 7h sáng không?
+        if (settings.daily_weather_noti !== true) {
+          console.log(`❌ LỖI: User này đã tắt thông báo thời tiết.`);
+          continue;
+        }
+
+        const tz = settings.timezone || 'Asia/Ho_Chi_Minh';
         const userCurrentHour = moment().tz(tz).hour();
-        // if (userCurrentHour === 7) or if (userCurrentHour === moment().tz(tz).hour())
+
+        console.log(`🕒 Timezone: ${tz} | Giờ hiện tại: ${userCurrentHour}`);
+
+        // Hack test: Chạy ở giờ hiện tại
         if (userCurrentHour === moment().tz(tz).hour()) {
-          const lat = settings?.last_lat;
-          const lon = settings?.last_long;
+          const lat = settings.last_lat;
+          const lon = settings.last_long;
+          const token = user.fcm_token;
 
-          if (lat && lon && user.fcm_token) {
-            // 3. Gọi API thời tiết từ WeatherService
-            const weatherData = await WeatherService.getDailyWeather(lat, lon, tz);
-            
-            // 4. Sinh nội dung thông minh
-            const message = WeatherService.generateWeatherMessage(weatherData);
+          console.log(`📍 Tọa độ: ${lat}, ${lon}`);
+          console.log(`📱 FCM Token: ${token ? 'Đã có' : 'NULL'}`);
 
-            // 5. GỬI PUSH NOTIFICATION (Đã sửa lại cách gọi hàm)
-            await sendPushNotification(
-              user.fcm_token,
-              'Dự báo thời tiết hôm nay 🌦️',
-              message
-            );
-            
-            console.log(`✅ Đã gửi thông báo cho user ${user.email} (Timezone: ${tz})`);
+          // 2. Kiểm tra dữ liệu bắt buộc
+          if (!lat || !lon) {
+            console.log(`❌ LỖI: Thiếu tọa độ lat/lon.`);
+            continue;
+          }
+          if (!token) {
+            console.log(`❌ LỖI: Thiếu fcm_token.`);
+            continue;
+          }
+
+          // 3. Nếu qua hết các ải, tiến hành gửi
+          console.log(`✅ Đủ điều kiện! Đang gọi API thời tiết...`);
+          const weatherData = await WeatherService.getDailyWeather(lat, lon, tz);
+          const message = WeatherService.generateWeatherMessage(weatherData);
+
+          console.log(`✉️ Nội dung gửi: ${message}`);
+          
+          const success = await sendPushNotification(token, 'Dự báo thời tiết 🌦️', message);
+          
+          if (success) {
+            console.log(`🚀 ĐÃ GỬI THÀNH CÔNG CHO ${user.email}`);
+          } else {
+            console.log(`⚠️ Gửi thất bại từ Firebase (Token có thể hết hạn hoặc sai)`);
           }
         }
       }
+      console.log('--- 🛑 KẾT THÚC CRON JOB ---\n');
     } catch (error) {
       console.error('❌ Lỗi chạy Cron Job thời tiết:', error);
     }
