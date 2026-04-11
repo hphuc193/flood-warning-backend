@@ -17,7 +17,8 @@ export const createReport = async (req: Request, res: Response) => {
     const authReq = req as AuthRequest;
     const user_id = authReq.user?.id;
     
-    const { lat, long, description } = req.body;
+    // LẤY THÊM category VÀ severity TỪ BODY
+    const { lat, long, description, category, severity } = req.body;
     const files = req.files as Express.Multer.File[];
 
     if (!user_id) {
@@ -26,6 +27,15 @@ export const createReport = async (req: Request, res: Response) => {
 
     if (!lat || !long) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin lat hoặc long' });
+    }
+
+    // Validate Mức độ nghiêm trọng (1 -> 5)
+    let severityLevel = 1; // Mặc định
+    if (severity) {
+      severityLevel = parseInt(severity as string);
+      if (isNaN(severityLevel) || severityLevel < 1 || severityLevel > 5) {
+        return res.status(400).json({ success: false, message: 'Mức độ nghiêm trọng phải là số từ 1 đến 5' });
+      }
     }
 
     const imageUrls: string[] = [];
@@ -54,12 +64,14 @@ export const createReport = async (req: Request, res: Response) => {
       }
     }
 
-    // Lưu vào Database
+    // Lưu vào Database với các trường mới
     const newReport = await Report.create({
       user_id: user_id, 
       lat: parseFloat(lat),
       long: parseFloat(long),
       description,
+      category: category || null, // Lưu loại sự cố
+      severity: severityLevel,    // Lưu mức độ nghiêm trọng
       images: imageUrls
     });
 
