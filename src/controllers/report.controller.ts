@@ -6,8 +6,8 @@ import ReportVote from '../models/ReportVote'; // Import thêm Model Vote
 import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
-import { Sequelize } from 'sequelize';
-import { sequelize } from '../config/database'; // Import để dùng Transaction
+import { Sequelize, Op } from 'sequelize';
+import { sequelize } from '../config/database';
 
 Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
@@ -93,10 +93,40 @@ export const createReport = async (req: Request, res: Response) => {
 export const getReports = async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
-    const user_id = authReq.user?.id; // Lấy user_id để check vote
+    const user_id = authReq.user?.id;
 
-    const reports = await Report.findAll({
-      order: [['created_at', 'DESC']],
+    // 1. Trích xuất Query Parameters
+    // Nếu không truyền, mặc định là trang 1, mỗi trang lấy 15 báo cáo
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 15;
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+
+    // Tính toán vị trí bắt đầu lấy dữ liệu (Offset)
+    const offset = (page - 1) * limit;
+
+    // 2. Xây dựng bộ điều kiện truy vấn (Where Clause)
+    let whereClause: any = {};
+
+    // Filter theo status (nếu có truyền lên: pending, verified, rejected)
+    if (status) {
+      whereClause.status = status;
+    }
+
+    // Tìm kiếm trong cột description (nếu có)
+    if (search) {
+      whereClause.description = {
+        // Sử dụng iLike cho PostgreSQL để tìm kiếm không phân biệt hoa thường
+        [Op.iLike]: `%${search}%` 
+      };
+    }
+
+    // 3. Thực thi truy vấn lấy dữ liệu VÀ tổng số đếm
+    const { count, rows: reports } = await Report.findAndCountAll({
+      where: whereClause,
+      limit: limit,
+      offset: offset,
+      order: [['created_at', 'DESC']], // Báo cáo mới nhất lên đầu
       include: [
         {
           model: User,
@@ -108,9 +138,11 @@ export const getReports = async (req: Request, res: Response) => {
 
     let responseData = reports.map(r => r.toJSON());
 
-    // Nếu có user đang đăng nhập, query bảng Vote để map trạng thái
+    // 4. Map trạng thái Vote của User hiện tại (Logic cũ giữ nguyên)
     if (user_id) {
-      const userVotes = await ReportVote.findAll({ where: { user_id } });
+      const userVotes = await ReportVote.findAll({ 
+        where: { user_id, report_id: reports.map(r => r.id) } // Chỉ query những báo cáo trong trang hiện tại để tối ưu
+      });
       const voteMap = new Map(userVotes.map(v => [v.report_id, v.type]));
       
       responseData = responseData.map(report => ({
@@ -121,7 +153,24 @@ export const getReports = async (req: Request, res: Response) => {
       responseData = responseData.map(report => ({ ...report, current_user_vote: null }));
     }
 
-    return res.status(200).json({ success: true, data: responseData });
+    // 5. Tính toán dữ liệu phân trang (Meta Data)
+    const totalPages = Math.ceil(count / limit);
+    const meta = {
+      current_page: page,
+      total_pages: totalPages,
+      total_items: count,
+      limit: limit,
+      has_next: page < totalPages,
+      has_previous: page > 1
+    };
+
+    // Trả về JSON chuẩn RESTful API
+    return res.status(200).json({ 
+      success: true, 
+      meta: meta, 
+      data: responseData 
+    });
+
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
