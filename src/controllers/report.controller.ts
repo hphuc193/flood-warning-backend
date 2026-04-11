@@ -108,37 +108,71 @@ export const getReports = async (req: Request, res: Response) => {
     const user_id = authReq.user?.id;
 
     // 1. Trích xuất Query Parameters
-    // Nếu không truyền, mặc định là trang 1, mỗi trang lấy 15 báo cáo
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 15;
     const search = req.query.search as string;
     const status = req.query.status as string;
+    
+    // CÁC QUERY PARAMS MỚI BỔ SUNG
+    const category = req.query.category as string;
+    const severity = req.query.severity as string;
+    const time_range = req.query.time_range as string; // '24h', '3d', '7d', '30d'
 
-    // Tính toán vị trí bắt đầu lấy dữ liệu (Offset)
     const offset = (page - 1) * limit;
 
-    // 2. Xây dựng bộ điều kiện truy vấn (Where Clause)
+    // 2. Xây dựng bộ điều kiện truy vấn (Where Clause) linh hoạt
     let whereClause: any = {};
 
-    // Filter theo status (nếu có truyền lên: pending, verified, rejected)
-    if (status) {
-      whereClause.status = status;
+    if (status) whereClause.status = status;
+    
+    // Lọc theo Loại sự cố (VD: "Ngập nước", "Cây đổ")
+    if (category) whereClause.category = category;
+
+    // Lọc theo Mức độ nghiêm trọng
+    // Hỗ trợ truyền 1 số (VD: ?severity=4) hoặc nhiều số cách nhau dấu phẩy (VD: ?severity=4,5)
+    if (severity) {
+      const severities = severity.split(',').map(s => parseInt(s.trim()));
+      whereClause.severity = { [Op.in]: severities };
     }
 
-    // Tìm kiếm trong cột description (nếu có)
+    // Lọc theo khoảng thời gian (Time Range)
+    if (time_range) {
+      const now = new Date();
+      let startDate = new Date();
+
+      switch (time_range) {
+        case '24h':
+          startDate.setHours(now.getHours() - 24);
+          break;
+        case '3d':
+          startDate.setDate(now.getDate() - 3);
+          break;
+        case '7d':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        default:
+          startDate = new Date(0); // Nếu truyền sai, mặc định lấy từ đầu
+      }
+
+      // Lấy những báo cáo có thời gian tạo >= startDate
+      whereClause.created_at = { [Op.gte]: startDate };
+    }
+
     if (search) {
       whereClause.description = {
-        // Sử dụng iLike cho PostgreSQL để tìm kiếm không phân biệt hoa thường
         [Op.iLike]: `%${search}%` 
       };
     }
 
-    // 3. Thực thi truy vấn lấy dữ liệu VÀ tổng số đếm
+    // 3. Thực thi truy vấn với bộ lọc đã build
     const { count, rows: reports } = await Report.findAndCountAll({
       where: whereClause,
       limit: limit,
       offset: offset,
-      order: [['created_at', 'DESC']], // Báo cáo mới nhất lên đầu
+      order: [['created_at', 'DESC']],
       include: [
         {
           model: User,
@@ -150,10 +184,10 @@ export const getReports = async (req: Request, res: Response) => {
 
     let responseData = reports.map(r => r.toJSON());
 
-    // 4. Map trạng thái Vote của User hiện tại (Logic cũ giữ nguyên)
-    if (user_id) {
+    // 4. Map trạng thái Vote của User hiện tại
+    if (user_id && reports.length > 0) {
       const userVotes = await ReportVote.findAll({ 
-        where: { user_id, report_id: reports.map(r => r.id) } // Chỉ query những báo cáo trong trang hiện tại để tối ưu
+        where: { user_id, report_id: reports.map(r => r.id) } 
       });
       const voteMap = new Map(userVotes.map(v => [v.report_id, v.type]));
       
@@ -176,7 +210,6 @@ export const getReports = async (req: Request, res: Response) => {
       has_previous: page > 1
     };
 
-    // Trả về JSON chuẩn RESTful API
     return res.status(200).json({ 
       success: true, 
       meta: meta, 
