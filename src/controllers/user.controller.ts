@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import User from '../models/User';
 import admin from 'firebase-admin'; // Khai báo Firebase Admin
-
+import UserSetting from '../models/UserSetting';
 // 1. Lấy thông tin cá nhân
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -97,6 +97,37 @@ export const updateAvatar = async (req: Request, res: Response) => {
     });
 
     blobStream.end(file.buffer);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// API Cập nhật thiết bị và vị trí (Dùng cho Weather Cron Job & Push Notification)
+export const updateDeviceInfo = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const user_id = authReq.user?.id;
+    const { fcm_token, lat, long, timezone } = req.body;
+
+    if (!user_id) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+    // 1. Cập nhật FCM Token vào bảng User để nhận Push Notification
+    if (fcm_token) {
+      await User.update({ fcm_token }, { where: { id: user_id } });
+    }
+
+    // 2. Lưu tọa độ và Timezone vào bảng UserSettings (Nếu chưa có thì tạo mới)
+    await UserSetting.upsert({
+      user_id: user_id,
+      last_lat: lat ? parseFloat(lat) : null,
+      last_long: long ? parseFloat(long) : null,
+      timezone: timezone || 'Asia/Ho_Chi_Minh'
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Đã cập nhật thông tin thiết bị và vị trí' 
+    });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }

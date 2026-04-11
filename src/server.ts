@@ -17,6 +17,7 @@ import checklistRoutes from './routes/checklist.routes';
 import evacuationRoutes from './routes/evacuation.routes';
 import emergencyRoutes from './routes/emergency.routes';
 import sosRoutes from './routes/sos.routes';
+import { startWeatherCronJob } from './jobs/weatherNotification.job';
 // import socketService from './services/socket.service'; 
 
 import './models/User';

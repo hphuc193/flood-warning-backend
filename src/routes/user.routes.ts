@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getProfile, updateProfile, updateAvatar } from '../controllers/user.controller';
+import { getProfile, updateProfile, updateAvatar, updateDeviceInfo } from '../controllers/user.controller';
 import { verifyToken } from '../middleware/auth.middleware';
 import { uploadAvatarMiddleware } from '../middleware/upload.middleware'; // Import middleware xử lý file
 
@@ -97,5 +97,7 @@ router.patch(
   uploadAvatarMiddleware.single('avatar'),
   updateAvatar
 );
+
+router.post('/device', verifyToken, updateDeviceInfo);
 
 export default router;
