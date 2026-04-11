@@ -2,11 +2,15 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import Report from '../models/Report';
 import User from '../models/User';
+import ReportVote from '../models/ReportVote'; // Import thêm Model Vote
 import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
 import { Sequelize } from 'sequelize';
+import { sequelize } from '../config/database'; // Import để dùng Transaction
+
 Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // 1. Tạo báo cáo mới
 export const createReport = async (req: Request, res: Response) => {
   try {
@@ -59,8 +63,7 @@ export const createReport = async (req: Request, res: Response) => {
       images: imageUrls
     });
 
-    // === BẢN VÁ AN TOÀN ĐỂ FIX LỖI ẨN DANH ===
-    // Tìm lại report vừa tạo, JOIN bảng User (dùng bí danh 'user' đã sửa ở Model)
+    // Tìm lại report vừa tạo, JOIN bảng User
     const reportWithUser = await Report.findByPk(newReport.id, {
       include: [
         {
@@ -71,7 +74,6 @@ export const createReport = async (req: Request, res: Response) => {
       ]
     });
 
-    // Ép sang JSON thuần để tránh lỗi Circular Dependency gây crash 500
     const responseData = reportWithUser ? reportWithUser.toJSON() : newReport;
 
     if (io) {
@@ -80,7 +82,6 @@ export const createReport = async (req: Request, res: Response) => {
     }
 
     return res.status(201).json({ success: true, data: responseData });
-    // ==========================================
 
   } catch (error: any) {
     console.error('Upload Error:', error);
@@ -88,32 +89,50 @@ export const createReport = async (req: Request, res: Response) => {
   }
 };
 
-// 2. get list report 
+// 2. Lấy danh sách báo cáo (Có kèm trạng thái Vote của User)
 export const getReports = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
+    const user_id = authReq.user?.id; // Lấy user_id để check vote
+
     const reports = await Report.findAll({
       order: [['created_at', 'DESC']],
       include: [
         {
           model: User,
-          as: 'user', // Phải khớp với tên alias bạn setup trong quan hệ belongsTo
-          attributes: ['id', 'full_name', 'avatar_url'] // Lấy tên và avatar
+          as: 'user', 
+          attributes: ['id', 'full_name', 'avatar_url'] 
         }
       ]
     });
-    return res.status(200).json({ success: true, data: reports });
+
+    let responseData = reports.map(r => r.toJSON());
+
+    // Nếu có user đang đăng nhập, query bảng Vote để map trạng thái
+    if (user_id) {
+      const userVotes = await ReportVote.findAll({ where: { user_id } });
+      const voteMap = new Map(userVotes.map(v => [v.report_id, v.type]));
+      
+      responseData = responseData.map(report => ({
+        ...report,
+        current_user_vote: voteMap.get(report.id) || null 
+      }));
+    } else {
+      responseData = responseData.map(report => ({ ...report, current_user_vote: null }));
+    }
+
+    return res.status(200).json({ success: true, data: responseData });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
 
 // 3. Admin duyệt hoặc từ chối báo cáo
-export const updateReportStatus = async (req: AuthRequest, res: Response) => {
+export const updateReportStatus = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params; // Lấy ID bài viết từ URL
-    const { status } = req.body; // Lấy trạng thái mới gửi lên ('verified' | 'rejected')
+    const { id } = req.params; 
+    const { status } = req.body; 
 
-    // Validate đầu vào
     if (!['verified', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
     }
@@ -123,11 +142,9 @@ export const updateReportStatus = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo' });
     }
 
-    // Cập nhật
-    report.status = status;
+    report.status = status as 'verified' | 'rejected';
     await report.save();
 
-    // === LOGIC THÔNG BÁO ===
     if (status === 'verified' && io) {
       io.emit('flood_verified', report); 
     }
@@ -139,20 +156,21 @@ export const updateReportStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 4. Lấy danh sách điểm ngập trong bán kính (Ví dụ: 10km)
+// 4. Lấy danh sách điểm ngập trong bán kính (Có kèm trạng thái Vote)
 export const getReportsNearby = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
+    const user_id = authReq.user?.id;
     const { lat, long, radius } = req.query;
 
     if (!lat || !long) {
       return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat, long' });
     }
 
-    const r = radius ? parseFloat(radius as string) : 5; // Mặc định 5km
+    const r = radius ? parseFloat(radius as string) : 5; 
     const userLat = parseFloat(lat as string);
     const userLong = parseFloat(long as string);
 
-    // Công thức Haversine để tính khoảng cách (đơn vị: km)
     const haversine = `(
       6371 * acos(
         cos(radians(${userLat})) *
@@ -180,9 +198,97 @@ export const getReportsNearby = async (req: Request, res: Response) => {
       order: Sequelize.literal('distance ASC') 
     });
 
-    return res.status(200).json({ success: true, count: reports.length, data: reports });
+    let responseData = reports.map(r => r.toJSON());
+
+    // Map trạng thái Vote cho báo cáo gần đây
+    if (user_id) {
+      const userVotes = await ReportVote.findAll({ where: { user_id } });
+      const voteMap = new Map(userVotes.map(v => [v.report_id, v.type]));
+      
+      responseData = responseData.map(report => ({
+        ...report,
+        current_user_vote: voteMap.get(report.id) || null 
+      }));
+    } else {
+      responseData = responseData.map(report => ({ ...report, current_user_vote: null }));
+    }
+
+    return res.status(200).json({ success: true, count: responseData.length, data: responseData });
 
   } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 5. Xử lý Upvote / Downvote báo cáo
+export const voteReport = async (req: Request, res: Response) => {
+  // Bật Transaction để đảm bảo tính nhất quán dữ liệu nếu có lỗi giữa chừng
+  const t = await sequelize.transaction();
+  try {
+    const authReq = req as AuthRequest;
+    const user_id = authReq.user?.id;
+    const { id } = req.params; 
+    const { type } = req.body; 
+
+    if (!user_id) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    if (!['upvote', 'downvote'].includes(type)) return res.status(400).json({ success: false, message: 'Loại vote không hợp lệ' });
+
+    const report = await Report.findByPk(Number(id), { transaction: t });
+    if (!report) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo' });
+    }
+
+    // Kiểm tra user đã vote bài này chưa
+    const existingVote = await ReportVote.findOne({ where: { report_id: id, user_id }, transaction: t });
+
+    if (existingVote) {
+      if (existingVote.type === type) {
+        // Bấm lại nút đang chọn -> Hủy vote
+        await existingVote.destroy({ transaction: t });
+        type === 'upvote' ? report.upvotes -= 1 : report.downvotes -= 1;
+      } else {
+        // Đổi từ upvote sang downvote (hoặc ngược lại)
+        existingVote.type = type;
+        await existingVote.save({ transaction: t });
+        if (type === 'upvote') {
+          report.upvotes += 1;
+          report.downvotes -= 1;
+        } else {
+          report.downvotes += 1;
+          report.upvotes -= 1;
+        }
+      }
+    } else {
+      // Bấm lần đầu
+      await ReportVote.create({ report_id: Number(id), user_id, type }, { transaction: t });
+      type === 'upvote' ? report.upvotes += 1 : report.downvotes += 1;
+    }
+
+    // Phòng hờ dữ liệu âm
+    if (report.upvotes < 0) report.upvotes = 0;
+    if (report.downvotes < 0) report.downvotes = 0;
+
+    await report.save({ transaction: t });
+    await t.commit();
+
+    // Bắn dữ liệu Real-time
+    if (io) {
+      io.emit('report_voted', { 
+        report_id: report.id, 
+        upvotes: report.upvotes, 
+        downvotes: report.downvotes 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Vote thành công',
+      data: { upvotes: report.upvotes, downvotes: report.downvotes } 
+    });
+
+  } catch (error: any) {
+    await t.rollback();
     return res.status(500).json({ success: false, error: error.message });
   }
 };

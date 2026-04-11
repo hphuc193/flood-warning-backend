@@ -1,6 +1,5 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
-// KHÔNG import User tại đây để tránh Circular Dependency
 
 interface ReportAttributes {
   id: number;
@@ -10,23 +9,26 @@ interface ReportAttributes {
   description?: string | null;
   images: string[];
   status: 'pending' | 'verified' | 'rejected';
+  upvotes: number;
+  downvotes: number;
 }
 
-interface ReportCreationAttributes extends Optional<ReportAttributes, 'id' | 'status' | 'images'> {}
+interface ReportCreationAttributes extends Optional<ReportAttributes, 'id' | 'status' | 'images' | 'upvotes' | 'downvotes'> {}
 
 class Report extends Model<ReportAttributes, ReportCreationAttributes> implements ReportAttributes {
   public id!: number;
   public user_id!: number;
   public lat!: number;
   public long!: number;
-  public description?: string | null; // Sửa lại cho khớp với Nullable của DB
+  public description?: string | null;
   public images!: string[];
   public status!: 'pending' | 'verified' | 'rejected';
+  public upvotes!: number;     // Thêm mới
+  public downvotes!: number;   // Thêm mới
   
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 
-  // Khai báo hàm associate để gọi ở file index.ts
   public static associate(models: any) {
     Report.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
   }
@@ -38,15 +40,13 @@ Report.init(
     user_id: { 
       type: DataTypes.INTEGER, 
       allowNull: false 
-      // Có thể thêm tham chiếu ở mức DB Constraint tại đây:
-      // references: { model: 'users', key: 'id' }
     },
     lat: { 
-      type: DataTypes.DECIMAL(10, 8), // Tối ưu cho tọa độ
+      type: DataTypes.DECIMAL(10, 8), 
       allowNull: false 
     },
     long: { 
-      type: DataTypes.DECIMAL(11, 8), // Tối ưu cho tọa độ
+      type: DataTypes.DECIMAL(11, 8), 
       allowNull: false 
     },
     description: { 
@@ -54,19 +54,29 @@ Report.init(
       allowNull: true
     },
     images: { 
-      // Lưu ý: Đảm bảo bạn đang dùng PostgreSQL. Nếu dùng DB khác, đổi sang DataTypes.JSON
       type: DataTypes.ARRAY(DataTypes.TEXT), 
       defaultValue: [] 
     },
     status: { 
       type: DataTypes.ENUM('pending', 'verified', 'rejected'), 
       defaultValue: 'pending' 
+    },
+    // Khai báo 2 cột mới trong DB
+    upvotes: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0 // Đảm bảo số mặc định luôn là 0 để tính toán (+/-) không bị lỗi NaN
+    },
+    downvotes: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     }
   },
   { 
     sequelize, 
     tableName: 'reports',
-    underscored: true, // Ép Sequelize map createdAt -> created_at
+    underscored: true,
     timestamps: true 
   }
 );
