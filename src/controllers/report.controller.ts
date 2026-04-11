@@ -99,7 +99,7 @@ export const createReport = async (req: Request, res: Response) => {
     console.error('Upload Error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
-};
+};  
 
 // 2. Lấy danh sách báo cáo (Có kèm trạng thái Vote của User)
 export const getReports = async (req: Request, res: Response) => {
