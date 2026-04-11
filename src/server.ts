@@ -65,6 +65,9 @@ const startServer = async () => {
   try {
     // Kết nối Database
     await connectDB();
+
+    startWeatherCronJob();
+    console.log('⏰ Cron jobs đã được kích hoạt');
     
     // Đồng bộ Model (Chỉ cần chạy 1 lần)
     await sequelize.sync({ alter: true });
