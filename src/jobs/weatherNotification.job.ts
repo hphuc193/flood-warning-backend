@@ -6,8 +6,8 @@ import { WeatherService } from '../services/weather.service';
 import { sendPushNotification } from '../services/notification.service';
 
 export const startWeatherCronJob = () => {
-  // Chạy vào phút thứ 0 của mỗi giờ (Ví dụ: 6:00, 7:00, 8:00...)
-  cron.schedule('0 * * * *', async () => {
+  // Chạy vào phút thứ 0 của mỗi giờ (Ví dụ: 6:00, 7:00, 8:00...) '* * * * *' or '0 * * * *'
+  cron.schedule('* * * * *', async () => {
     console.log('⏳ [Cron Job] Đang kiểm tra để gửi thông báo thời tiết buổi sáng...');
 
     try {
@@ -30,8 +30,8 @@ export const startWeatherCronJob = () => {
 
         // 2. Kiểm tra xem ở múi giờ của user này, hiện tại có phải là 7h sáng không?
         const userCurrentHour = moment().tz(tz).hour();
-
-        if (userCurrentHour === 7) {
+        // if (userCurrentHour === 7) or if (userCurrentHour === moment().tz(tz).hour())
+        if (userCurrentHour === moment().tz(tz).hour()) {
           const lat = settings?.last_lat;
           const lon = settings?.last_long;
 
