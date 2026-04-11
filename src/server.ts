@@ -25,7 +25,7 @@ import './models/Location';
 import './models/WeatherData';
 import './models/Alert';
 import './models/Report';
-
+import './models/UserSetting';
 dotenv.config();
 
 const app = express();
