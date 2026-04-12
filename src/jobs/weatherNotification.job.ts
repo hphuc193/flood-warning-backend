@@ -39,7 +39,10 @@ export const startWeatherCronJob = () => {
           continue;
         }
 
-        const tz = settings.timezone || 'Asia/Ho_Chi_Minh';
+        let tz = settings.timezone || 'Asia/Ho_Chi_Minh';
+        if (!tz.includes('/')) {
+            tz = 'Asia/Ho_Chi_Minh';
+        }
         const userCurrentHour = moment().tz(tz).hour();
 
         console.log(`🕒 Timezone: ${tz} | Giờ hiện tại: ${userCurrentHour}`);
