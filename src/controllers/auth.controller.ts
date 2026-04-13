@@ -141,7 +141,7 @@ export const loginWithFirebase = async (req: Request, res: Response) => {
       // Nếu đã có -> Cập nhật thông tin mới nhất từ Google (tùy chọn)
       user.update({
         full_name: name || user.full_name,
-        avatar_url: picture || user.avatar_url
+        // avatar_url: picture || user.avatar_url
       });
     }
 
@@ -234,7 +234,7 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
       // Đã tồn tại -> Cập nhật tên và avatar mới nhất
       user.update({
         full_name: name || user.full_name,
-        avatar_url: picture || user.avatar_url
+        // avatar_url: picture || user.avatar_url
       });
     }
 
