@@ -17,7 +17,9 @@ import checklistRoutes from './routes/checklist.routes';
 import evacuationRoutes from './routes/evacuation.routes';
 import emergencyRoutes from './routes/emergency.routes';
 import sosRoutes from './routes/sos.routes';
+import aiRoutes from './routes/ai.routes';  
 import { startWeatherCronJob } from './jobs/weatherNotification.job';
+import { startAIPredictionJob } from './jobs/aiPrediction.job';
 // import socketService from './services/socket.service'; 
 
 import './models/User';
@@ -26,6 +28,7 @@ import './models/WeatherData';
 import './models/Alert';
 import './models/Report';
 import './models/UserSetting';
+import './models/AIFloodPrediction';
 dotenv.config();
 
 const app = express();
@@ -58,6 +61,7 @@ app.use('/api/v1/checklists', checklistRoutes);
 app.use('/api/v1/evacuation', evacuationRoutes);
 app.use('/api/v1/emergency-contacts', emergencyRoutes);
 app.use('/api/v1/sos', sosRoutes);
+app.use('/api/v1/ai', aiRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
@@ -69,6 +73,8 @@ const startServer = async () => {
     startWeatherCronJob();
     console.log('⏰ Cron jobs đã được kích hoạt');
     
+    startAIPredictionJob();
+    console.log('🤖 AI Cron Job đã được kích hoạt');
     // Đồng bộ Model (Chỉ cần chạy 1 lần)
     await sequelize.sync({ alter: true });
     console.log(' 📩 Database synchronized.');
