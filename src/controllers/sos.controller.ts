@@ -12,10 +12,11 @@ SosAlert.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 export const saveSosTemplate = async (req: Request, res: Response) => {
   try {
     const user_id = (req as AuthRequest).user?.id;
-    const { default_description } = req.body;
+    const { default_description, contact_phone } = req.body; // Lấy thêm contact_phone
 
     const [template, created] = await SosTemplate.upsert({
       user_id: user_id as number,
+      contact_phone: contact_phone || null,
       default_description
     });
 
@@ -29,19 +30,24 @@ export const saveSosTemplate = async (req: Request, res: Response) => {
 export const sendSosOnline = async (req: Request, res: Response) => {
   try {
     const user_id = (req as AuthRequest).user?.id;
-    const { lat, long, emergency_type, description, timestamp } = req.body;
+    const { lat, long, emergency_type, description, contact_phone, timestamp } = req.body; // Nhận thêm contact_phone
+
+    // Lấy template để fallback nếu user không truyền contact_phone lúc bấm nút
+    const template = await SosTemplate.findOne({ where: { user_id } });
+    const finalPhone = contact_phone || (template ? template.contact_phone : null);
 
     const sos = await SosAlert.create({
       user_id: user_id as number,
-      location: { type: 'Point', coordinates: [long, lat] }, // Chú ý: [Kinh độ, Vĩ độ]
+      location: { type: 'Point', coordinates: [long, lat] },
+      contact_phone: finalPhone,
       emergency_type,
       description,
       reported_at: timestamp ? new Date(timestamp) : new Date()
     });
 
-    // if (io) {
-    //   io.emit('new_sos_alert', sos); // Kích hoạt chuông báo động trên Web Admin
-    // }
+    if (io) {
+      io.emit('new_sos_alert', sos);
+    }
 
     return res.status(201).json({ success: true, message: 'Đã gửi tín hiệu SOS thành công', data: sos });
   } catch (error: any) {
@@ -53,7 +59,6 @@ export const sendSosOnline = async (req: Request, res: Response) => {
 // Cú pháp tin nhắn SMS: SOS|USER123|10.762622|106.660172|FLOOD|171234567
 export const receiveSosSmsWebhook = async (req: Request, res: Response) => {
   try {
-    // SMS Gateway thường bắn nội dung tin nhắn vào req.body.message hoặc req.body.text
     const smsContent = req.body.message || req.body.text; 
     
     if (!smsContent || !smsContent.startsWith('SOS|')) {
@@ -64,24 +69,28 @@ export const receiveSosSmsWebhook = async (req: Request, res: Response) => {
     if (parts.length < 6) return res.status(400).json({ success: false, message: 'Thiếu dữ liệu' });
 
     const [, userIdStr, latStr, longStr, emergency_type, timestampStr] = parts;
-    const user_id = parseInt(userIdStr.replace('USER', '')); // Lọc lấy số ID
+    const user_id = parseInt(userIdStr.replace('USER', ''));
     const lat = parseFloat(latStr);
     const long = parseFloat(longStr);
     
-    // Lấy thông tin mô tả mặc định của User này từ DB
+    // Lấy số điện thoại và mô tả từ template
     const template = await SosTemplate.findOne({ where: { user_id } });
     const description = template ? template.default_description : 'SOS khẩn cấp qua SMS';
+    const contact_phone = template ? template.contact_phone : null;
 
-    // Lưu vào hệ thống
     const sos = await SosAlert.create({
       user_id,
       location: { type: 'Point', coordinates: [long, lat] },
+      contact_phone,
       emergency_type,
       description,
       reported_at: new Date(parseInt(timestampStr))
     });
 
-    // Trả về 200 OK để SMS Gateway biết là đã nhận thành công
+    if (io) {
+      io.emit('new_sos_alert', sos);
+    }
+
     return res.status(200).json({ success: true, message: 'Đã nhận và xử lý SMS SOS' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
