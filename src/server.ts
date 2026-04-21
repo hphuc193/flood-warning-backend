@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
+import cors from 'cors';
 
 import reportRoutes from './routes/report.routes';
 import authRoutes from './routes/auth.routes';
@@ -32,6 +33,12 @@ import './models/AIFloodPrediction';
 dotenv.config();
 
 const app = express();
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
 
 // 1. Tạo HTTP Server
 export const httpServer = createServer(app);
