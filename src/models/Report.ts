@@ -12,7 +12,9 @@ interface ReportAttributes {
   images: string[];
   status: 'pending' | 'verified' | 'rejected';
   upvotes: number;     
-  downvotes: number;   
+  downvotes: number;
+  createdAt?: Date;
+  updatedAt?: Date;   
 }
 
 interface ReportCreationAttributes extends Optional<ReportAttributes, 'id' | 'status' | 'images' | 'upvotes' | 'downvotes' | 'category' | 'severity'> {}

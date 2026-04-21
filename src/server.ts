@@ -7,6 +7,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import cors from 'cors';
 
+import syncRoutes from './routes/sync.routes';
 import reportRoutes from './routes/report.routes';
 import authRoutes from './routes/auth.routes';
 import locationRoutes from './routes/location.routes';
@@ -69,6 +70,7 @@ app.use('/api/v1/evacuation', evacuationRoutes);
 app.use('/api/v1/emergency-contacts', emergencyRoutes);
 app.use('/api/v1/sos', sosRoutes);
 app.use('/api/v1/ai', aiRoutes);
+app.use('/api/v1/sync', syncRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
