@@ -7,7 +7,7 @@ import { WeatherService } from '../services/weather.service';
 import { sendPushNotification } from '../services/notification.service';
 
 export const startWeatherCronJob = () => {
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('0 * * * *', async () => {
     console.log('\n--- 🔍 BẮT ĐẦU CHẠY CRON JOB ---');
 
     try {
@@ -30,7 +30,8 @@ export const startWeatherCronJob = () => {
         if (!tz.includes('/')) tz = 'Asia/Ho_Chi_Minh';
         const userCurrentHour = moment().tz(tz).hour();
 
-        if (userCurrentHour === moment().tz(tz).hour()) {
+        // if (userCurrentHour === moment().tz(tz).hour()) {
+        if (userCurrentHour === 7) {
           const lat = settings.last_lat;
           const lon = settings.last_long;
           const token = user.fcm_token;
