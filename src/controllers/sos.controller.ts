@@ -39,9 +39,9 @@ export const sendSosOnline = async (req: Request, res: Response) => {
       reported_at: timestamp ? new Date(timestamp) : new Date()
     });
 
-    if (io) {
-      io.emit('new_sos_alert', sos); // Kích hoạt chuông báo động trên Web Admin
-    }
+    // if (io) {
+    //   io.emit('new_sos_alert', sos); // Kích hoạt chuông báo động trên Web Admin
+    // }
 
     return res.status(201).json({ success: true, message: 'Đã gửi tín hiệu SOS thành công', data: sos });
   } catch (error: any) {
