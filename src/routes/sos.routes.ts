@@ -1,9 +1,13 @@
 import { Router } from 'express';
-import { verifyToken } from '../middleware/auth.middleware';
+import { verifyToken, checkAdmin } from '../middleware/auth.middleware';
 import { 
   saveSosTemplate, 
   sendSosOnline, 
-  receiveSosSmsWebhook 
+  receiveSosSmsWebhook,
+  getActiveSosForMap, 
+  getAllSosAlerts,
+  updateSosStatus,
+  deleteSosAlert
 } from '../controllers/sos.controller';
 
 const router = Router();
@@ -95,7 +99,20 @@ router.post('/online', verifyToken, sendSosOnline);
  *       200:
  *         description: Đã nhận và xử lý SMS
  */
-// Lưu ý: Route này không dùng verifyToken vì nó được gọi từ máy chủ SMS Gateway thứ 3
+// Lưu ý: Route này không dùng verifyToken vì nó được gọi từ máy c  hủ SMS Gateway thứ 3
 router.post('/webhook/sms', receiveSosSmsWebhook);
+
+// 🛡️ ADMIN ROUTES: QUẢN LÝ SOS & BẢN ĐỒ
+// 1. Lấy dữ liệu cho Trang Bản Đồ SOS (SOS Map)
+router.get('/map', verifyToken, checkAdmin, getActiveSosForMap);
+
+// 2. Lấy dữ liệu cho Bảng quản lý SOS (Dạng Table)
+router.get('/', verifyToken, checkAdmin, getAllSosAlerts);
+
+// 3. Đổi trạng thái xử lý cứu hộ
+router.patch('/:id/status', verifyToken, checkAdmin, updateSosStatus);
+
+// 4. Xóa SOS rác/test
+router.delete('/:id', verifyToken, checkAdmin, deleteSosAlert);
 
 export default router;
