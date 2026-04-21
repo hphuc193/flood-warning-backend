@@ -386,3 +386,28 @@ export const voteReport = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ADMIN ----------------------------------------------------
+// [Admin] Xóa báo cáo
+export const deleteReport = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const report = await Report.findByPk(Number(id));
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy báo cáo' });
+    }
+
+    // Xóa báo cáo trong Database
+    // Ghi chú: Nếu muốn cẩn thận hơn, bạn có thể viết thêm logic xóa ảnh trên Firebase Storage tương ứng với report.images
+    await report.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã xóa báo cáo thành công'
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

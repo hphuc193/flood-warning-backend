@@ -5,7 +5,8 @@ import {
     getReports, 
     updateReportStatus, 
     getReportsNearby,
-    voteReport
+    voteReport,
+    deleteReport
 } from '../controllers/report.controller';
 import { verifyToken, checkAdmin } from '../middleware/auth.middleware';
 
@@ -20,8 +21,10 @@ router.get('/nearby', getReportsNearby);
 
 router.get('/', verifyToken, getReports); 
 router.post('/', verifyToken, upload.array('images', 5), createReport);
-router.patch('/:id/status', verifyToken, checkAdmin, updateReportStatus);
-
 router.post('/:id/vote', verifyToken, voteReport);
+// ADMIN -------------------------------------------------
+router.patch('/:id/status', verifyToken, checkAdmin, updateReportStatus);
+router.delete('/:id', verifyToken, checkAdmin, deleteReport);
+
 
 export default router;

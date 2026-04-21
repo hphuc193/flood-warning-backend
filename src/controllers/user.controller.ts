@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import User from '../models/User';
 import admin from 'firebase-admin'; // Khai báo Firebase Admin
 import UserSetting from '../models/UserSetting';
+import { Op } from 'sequelize';
 // 1. Lấy thông tin cá nhân
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -127,6 +128,101 @@ export const updateDeviceInfo = async (req: Request, res: Response) => {
     return res.status(200).json({ 
       success: true, 
       message: 'Đã cập nhật thông tin thiết bị và vị trí' 
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ADMIN -----------------------------------------------------------------------------------
+
+// 1. [Admin] Lấy danh sách toàn bộ người dùng (Có phân trang và tìm kiếm)
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string;
+    const offset = (page - 1) * limit;
+
+    let whereClause: any = {};
+    if (search) {
+      whereClause = {
+        [Op.or]: [
+          { full_name: { [Op.iLike]: `%${search}%` } },
+          { email: { [Op.iLike]: `%${search}%` } },
+          { phone_number: { [Op.iLike]: `%${search}%` } }
+        ]
+      };
+    }
+
+    const { count, rows: users } = await User.findAndCountAll({
+      where: whereClause,
+      attributes: { exclude: ['password'] }, // Tuyệt đối không trả về password
+      limit: limit,
+      offset: offset,
+      order: [['created_at', 'DESC']]
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    return res.status(200).json({
+      success: true,
+      meta: {
+        current_page: page,
+        total_pages: totalPages,
+        total_items: count,
+        limit: limit
+      },
+      data: users
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 2. [Admin] Cập nhật phân quyền người dùng (Cấp quyền Admin)
+export const updateUserRole = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Quyền (role) không hợp lệ, chỉ chấp nhận "user" hoặc "admin"' });
+    }
+
+    const user = await User.findByPk(Number(id));
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    user.role = role;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã cập nhật quyền của người dùng thành ${role.toUpperCase()}`
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 3. [Admin] Xóa (hoặc Khóa) người dùng
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByPk(Number(id));
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+    }
+
+    // Xóa user (Hoặc bạn có thể dùng soft-delete bằng cách thêm cờ is_active = false)
+    await user.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã xóa người dùng thành công'
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
