@@ -20,8 +20,10 @@ import evacuationRoutes from './routes/evacuation.routes';
 import emergencyRoutes from './routes/emergency.routes';
 import sosRoutes from './routes/sos.routes';
 import aiRoutes from './routes/ai.routes';  
+import notificationRoutes from './routes/notification.routes';
 import { startWeatherCronJob } from './jobs/weatherNotification.job';
 import { startAIPredictionJob } from './jobs/aiPrediction.job';
+
 // import socketService from './services/socket.service'; 
 
 import './models/User';
@@ -71,6 +73,7 @@ app.use('/api/v1/emergency-contacts', emergencyRoutes);
 app.use('/api/v1/sos', sosRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server

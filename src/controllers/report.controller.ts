@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import Report from '../models/Report';
 import User from '../models/User';
-import ReportVote from '../models/ReportVote'; // Import thêm Model Vote
+import ReportVote from '../models/ReportVote';
+import Notification from '../models/Notification';
 import { firebaseStorage } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
@@ -70,36 +71,45 @@ export const createReport = async (req: Request, res: Response) => {
       lat: parseFloat(lat),
       long: parseFloat(long),
       description,
-      category: category || null, // Lưu loại sự cố
-      severity: severityLevel,    // Lưu mức độ nghiêm trọng
+      category: category || null,
+      severity: severityLevel,
       images: imageUrls
     });
 
-    // Tìm lại report vừa tạo, JOIN bảng User
-    const reportWithUser = await Report.findByPk(newReport.id, {
-      include: [
-        {
-          model: User,
-          as: 'user', 
-          attributes: ['id', 'full_name', 'avatar_url']
-        }
-      ]
-    });
-
+    const reportWithUser = await Report.findByPk(newReport.id, { /* ... */ });
     const responseData = reportWithUser ? reportWithUser.toJSON() : newReport;
 
     if (io) {
-        io.emit('new_flood_report', responseData);
-        console.log('📡 Đã bắn socket sự kiện: new_flood_report');
+      io.emit('new_flood_report', responseData);
+      console.log('📡 Đã bắn socket sự kiện: new_flood_report');
+    }
+
+    // 🌟 LƯU THÔNG BÁO CHO TẤT CẢ USER KHÁC 🌟
+    // Tìm danh sách ID của tất cả người dùng khác người tạo báo cáo
+    const otherUsers = await User.findAll({
+      attributes: ['id'],
+      where: { id: { [Op.ne]: user_id }, status: 'active' }
+    });
+
+    // Tạo mảng dữ liệu để Insert hàng loạt (Bulk Create) cho tối ưu hiệu năng
+    const notificationsToInsert = otherUsers.map(user => ({
+      user_id: user.id,
+      title: '🚨 Báo cáo ngập lụt mới!',
+      body: `Có một điểm ngập lụt mới (Mức độ: ${severityLevel}) vừa được cộng đồng báo cáo gần bạn.`,
+      type: 'REPORT',
+      is_read: false
+    }));
+
+    if (notificationsToInsert.length > 0) {
+      await Notification.bulkCreate(notificationsToInsert);
     }
 
     return res.status(201).json({ success: true, data: responseData });
-
   } catch (error: any) {
     console.error('Upload Error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
-};  
+};
 
 // 2. Lấy danh sách báo cáo (Có kèm trạng thái Vote của User)
 export const getReports = async (req: Request, res: Response) => {
