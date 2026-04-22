@@ -23,6 +23,7 @@ import aiRoutes from './routes/ai.routes';
 import notificationRoutes from './routes/notification.routes';
 import { startWeatherCronJob } from './jobs/weatherNotification.job';
 import { startAIPredictionJob } from './jobs/aiPrediction.job';
+import settingRoutes from './routes/setting.routes';
 
 // import socketService from './services/socket.service'; 
 
@@ -74,6 +75,7 @@ app.use('/api/v1/sos', sosRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/settings', settingRoutes);
 console.log('📄 Swagger Docs available at http://localhost:3000/api-docs');
 
 // Khởi động Server
