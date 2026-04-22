@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { verifyToken } from '../middleware/auth.middleware';
-import { getContacts, addCustomContact, deleteCustomContact } from '../controllers/emergency.controller';
+import { verifyToken, checkAdmin } from '../middleware/auth.middleware';
+import { getContacts, addCustomContact, deleteCustomContact, getAllLocalContacts, createLocalContact, deleteLocalContact } from '../controllers/emergency.controller';
 
 const router = Router();
 
@@ -62,5 +62,12 @@ router.post('/', addCustomContact);
  *         description: Xóa thành công
  */
 router.delete('/:id', deleteCustomContact);
+
+// ==========================================
+// 🛡️ ADMIN ROUTES: DANH BẠ ĐỊA PHƯƠNG
+// ==========================================
+router.get('/local', verifyToken, checkAdmin, getAllLocalContacts);
+router.post('/local', verifyToken, checkAdmin, createLocalContact);
+router.delete('/local/:id', verifyToken, checkAdmin, deleteLocalContact);
 
 export default router;
