@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { io } from '../server';
 import { Sequelize, Op } from 'sequelize';
 import { sequelize } from '../config/database';
+import UserLocation from '../models/UserLocation';
+import { sendPushNotification } from '../services/notification.service';
 
 Report.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
@@ -18,26 +20,15 @@ export const createReport = async (req: Request, res: Response) => {
     const authReq = req as AuthRequest;
     const user_id = authReq.user?.id;
     
-    // LẤY THÊM category VÀ severity TỪ BODY
     const { lat, long, description, category, severity } = req.body;
     const files = req.files as Express.Multer.File[];
 
-    if (!user_id) {
-        return res.status(401).json({ success: false, message: 'User ID không tồn tại trong Token' });
-    }
+    if (!user_id) return res.status(401).json({ success: false, message: 'User ID không tồn tại trong Token' });
+    if (!lat || !long) return res.status(400).json({ success: false, message: 'Thiếu thông tin lat hoặc long' });
 
-    if (!lat || !long) {
-      return res.status(400).json({ success: false, message: 'Thiếu thông tin lat hoặc long' });
-    }
-
-    // Validate Mức độ nghiêm trọng (1 -> 5)
-    let severityLevel = 1; // Mặc định
-    if (severity) {
-      severityLevel = parseInt(severity as string);
-      if (isNaN(severityLevel) || severityLevel < 1 || severityLevel > 5) {
-        return res.status(400).json({ success: false, message: 'Mức độ nghiêm trọng phải là số từ 1 đến 5' });
-      }
-    }
+    // Validate Mức độ nghiêm trọng
+    let severityLevel = parseInt(severity as string) || 1;
+    if (severityLevel < 1 || severityLevel > 5) severityLevel = 1;
 
     const imageUrls: string[] = [];
 
@@ -46,9 +37,7 @@ export const createReport = async (req: Request, res: Response) => {
       for (const file of files) {
         const filename = `reports/${uuidv4()}_${file.originalname}`;
         const blob = firebaseStorage.file(filename);
-        const blobStream = blob.createWriteStream({
-          metadata: { contentType: file.mimetype }
-        });
+        const blobStream = blob.createWriteStream({ metadata: { contentType: file.mimetype } });
 
         await new Promise((resolve, reject) => {
           blobStream.on('error', (err) => reject(err));
@@ -56,16 +45,12 @@ export const createReport = async (req: Request, res: Response) => {
           blobStream.end(file.buffer);
         });
 
-        const [url] = await blob.getSignedUrl({
-          action: 'read',
-          expires: '01-01-2100'
-        });
-        
+        const [url] = await blob.getSignedUrl({ action: 'read', expires: '01-01-2100' });
         imageUrls.push(url);
       }
     }
 
-    // Lưu vào Database với các trường mới
+    // Lưu báo cáo vào Database
     const newReport = await Report.create({
       user_id: user_id, 
       lat: parseFloat(lat),
@@ -76,35 +61,78 @@ export const createReport = async (req: Request, res: Response) => {
       images: imageUrls
     });
 
-    const reportWithUser = await Report.findByPk(newReport.id, { /* ... */ });
+    // Truy vấn kèm User info để gửi qua Socket
+    const reportWithUser = await Report.findByPk(newReport.id, { 
+      include: [{ model: User, as: 'user', attributes: ['id', 'full_name', 'avatar_url'] }] 
+    });
     const responseData = reportWithUser ? reportWithUser.toJSON() : newReport;
 
+    // 1. Gửi realtime cho những ai đang mở App ở khu vực đó (Socket.io)
     if (io) {
       io.emit('new_flood_report', responseData);
       console.log('📡 Đã bắn socket sự kiện: new_flood_report');
     }
 
-    // 🌟 LƯU THÔNG BÁO CHO TẤT CẢ USER KHÁC 🌟
-    // Tìm danh sách ID của tất cả người dùng khác người tạo báo cáo
-    const otherUsers = await User.findAll({
-      attributes: ['id'],
-      where: { id: { [Op.ne]: user_id }, status: 'active' }
+    // =========================================================================
+    // 🌟 2. LOGIC VỊ TRÍ QUAN TÂM (CHỈ GỬI THÔNG BÁO CHO NGƯỜI CÓ LIÊN QUAN) 🌟
+    // =========================================================================
+    
+    // Sử dụng hàm ST_DWithin của PostGIS để kiểm tra xem điểm ngập (lat, long) 
+    // có nằm trong bán kính (radius) của bất kỳ Vị trí quan tâm nào không.
+    // Lưu ý: PostGIS tính khoảng cách bằng mét, nên ta lấy radius * 1000
+    const pointQuery = `ST_SetSRID(ST_MakePoint(${parseFloat(long)}, ${parseFloat(lat)}), 4326)::geography`;
+
+    const affectedLocations = await UserLocation.findAll({
+      where: {
+        is_active: true,
+        user_id: { [Op.ne]: user_id }, // Không gửi thông báo cho chính người vừa báo cáo
+        [Op.and]: Sequelize.literal(`ST_DWithin(coordinates::geography, ${pointQuery}, radius * 1000)`)
+      },
+      include: [{ model: User, as: 'user', attributes: ['id', 'fcm_token'] }]
     });
 
-    // Tạo mảng dữ liệu để Insert hàng loạt (Bulk Create) cho tối ưu hiệu năng
-    const notificationsToInsert = otherUsers.map(user => ({
-      user_id: user.id,
-      title: '🚨 Báo cáo ngập lụt mới!',
-      body: `Có một điểm ngập lụt mới (Mức độ: ${severityLevel}) vừa được cộng đồng báo cáo gần bạn.`,
-      type: 'REPORT',
-      is_read: false
-    }));
+    // Dùng Map để lọc trùng (Trường hợp 1 người lưu 2 vị trí "Nhà Trọ" và "Trường học" quá gần nhau)
+    const usersToNotify = new Map();
+    for (const loc of affectedLocations) {
+      const user = (loc as any).user;
+      if (user && !usersToNotify.has(user.id)) {
+        usersToNotify.set(user.id, {
+          fcmToken: user.fcm_token,
+          locationName: loc.name
+        });
+      }
+    }
 
+    const notificationsToInsert = [];
+
+    // Lặp qua danh sách để bắn Push FCM và lưu lịch sử
+    for (const [id, data] of usersToNotify.entries()) {
+      const title = `⚠️ Cảnh báo quanh "${data.locationName}"`;
+      const body = `Khu vực "${data.locationName}" của bạn vừa có một báo cáo ngập lụt (Mức độ: ${severityLevel}).`;
+
+      // 1. Bắn Firebase Cloud Messaging đánh thức điện thoại
+      if (data.fcmToken) {
+        await sendPushNotification(data.fcmToken, title, body);
+      }
+
+      // 2. Chuẩn bị dữ liệu lưu vào Trung tâm thông báo
+      notificationsToInsert.push({
+        user_id: id,
+        title: title,
+        body: body,
+        type: 'REPORT',
+        is_read: false
+      });
+    }
+
+    // Lưu hàng loạt (Bulk Insert) để tối ưu hiệu năng DB
     if (notificationsToInsert.length > 0) {
       await Notification.bulkCreate(notificationsToInsert);
+      console.log(`✅ Đã gửi thông báo cho ${notificationsToInsert.length} người dùng quan tâm khu vực này.`);
     }
 
     return res.status(201).json({ success: true, data: responseData });
+
   } catch (error: any) {
     console.error('Upload Error:', error);
     return res.status(500).json({ success: false, error: error.message });
