@@ -12,20 +12,13 @@ export const getFloodForecast = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Thiếu location_id' });
     }
 
-    const now = new Date();
-    const endTime = moment(now).add(24, 'hours').toDate();
-
-    const predictions = await AIFloodPrediction.findAll({
-      where: {
-        location_id: location_id,
-        target_time: {
-          [Op.between]: [now, endTime]
-        }
-      },
-      order: [['target_time', 'ASC']]
+    // LẤY 24 DÒNG DỮ LIỆU MỚI NHẤT CỦA TRẠM (Không quan tâm là ngày nào để chống lỗi demo)
+    let predictions = await AIFloodPrediction.findAll({
+      where: { location_id: location_id },
+      order: [['target_time', 'DESC']], // Lấy từ mới nhất trở về trước
+      limit: 24
     });
 
-    // 🌟 ĐÃ SỬA CHỖ NÀY: Trả về 200 và mảng rỗng thay vì 404
     if (predictions.length === 0) {
       return res.status(200).json({ 
         success: true, 
@@ -33,10 +26,14 @@ export const getFloodForecast = async (req: Request, res: Response) => {
         data: {
           location_id: location_id,
           timeline_summary: null,
-          forecast_chart: [] // Mảng rỗng để Flutter không bị crash
+          forecast_chart: []
         }
       });
     }
+
+    // Vì ta đang lấy DESC (giảm dần), nên mảng đang bị ngược (giờ tương lai ở đầu, hiện tại ở cuối).
+    // Ta phải đảo ngược mảng lại (ASC) để Flutter vẽ biểu đồ từ trái sang phải cho đúng.
+    predictions = predictions.reverse();
 
     const summary = {
       t_start: predictions[0].t_start,
