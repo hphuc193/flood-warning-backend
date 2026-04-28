@@ -12,7 +12,6 @@ export const getFloodForecast = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Thiếu location_id' });
     }
 
-    // Lọc từ giờ hiện tại đến 24h sau
     const now = new Date();
     const endTime = moment(now).add(24, 'hours').toDate();
 
@@ -23,14 +22,22 @@ export const getFloodForecast = async (req: Request, res: Response) => {
           [Op.between]: [now, endTime]
         }
       },
-      order: [['target_time', 'ASC']] // Sắp xếp thời gian tăng dần để vẽ biểu đồ
+      order: [['target_time', 'ASC']]
     });
 
+    // 🌟 ĐÃ SỬA CHỖ NÀY: Trả về 200 và mảng rỗng thay vì 404
     if (predictions.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hệ thống AI đang xử lý, vui lòng thử lại sau ít phút.' });
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Hệ thống AI đang xử lý, vui lòng thử lại sau ít phút.',
+        data: {
+          location_id: location_id,
+          timeline_summary: null,
+          forecast_chart: [] // Mảng rỗng để Flutter không bị crash
+        }
+      });
     }
 
-    // Trích xuất Timeline tổng hợp từ dòng đầu tiên
     const summary = {
       t_start: predictions[0].t_start,
       t_peak: predictions[0].t_peak,
@@ -47,7 +54,7 @@ export const getFloodForecast = async (req: Request, res: Response) => {
           time: p.target_time,
           risk_score: p.risk_score,
           risk_level: p.risk_level,
-          water_level_cm: p.h_max // Hoặc giá trị mức nước từng giờ nếu bạn bổ sung
+          water_level_cm: p.h_max
         }))
       }
     });
