@@ -9,7 +9,7 @@ import { sendPushNotification } from '../services/notification.service';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000/api/ai/predict';
 
 export const startAIPredictionJob = () => {
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('* * * * *', async () => {
     console.log('🤖 [AI Job] Bắt đầu thu thập Data thực tế và gọi AI Service...');
     
     try {
